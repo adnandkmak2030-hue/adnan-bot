@@ -24,4 +24,4 @@ def ask_gemini(text):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
     data = {"contents": [{"parts": [{"text": text}]}]}
     try:
-r = requests.post(url, json=data, timeout=30)
+        r = requests.post(url, json=data, timeout=30)
