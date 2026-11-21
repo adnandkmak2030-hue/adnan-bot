@@ -4,7 +4,7 @@ import threading
 import requests
 from flask import Flask
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN") or os.getenv("TOKEN")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 
 print("Token exists:", bool(TELEGRAM_TOKEN))
@@ -21,7 +21,38 @@ def run_web():
     app.run(host="0.0.0.0", port=port)
 
 def ask_gemini(text):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
     data = {"contents": [{"parts": [{"text": text}]}]}
     try:
         r = requests.post(url, json=data, timeout=30)
+        j = r.json()
+        return j["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        print("Gemini error:", e)
+        return "صار خطأ، جرب بعد شوي."
+
+def send_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    requests.post(url, json={"chat_id": chat_id, "text": text})
+
+def run_bot():
+    offset = 0
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates?offset={offset}&timeout=30"
+            r = requests.get(url, timeout=35).json()
+            for u in r.get("result", []):
+                offset = u["update_id"] + 1
+                msg = u.get("message", {})
+                chat_id = msg.get("chat", {}).get("id")
+                text = msg.get("text", "")
+                if chat_id and text:
+                    reply = ask_gemini(text)
+                    send_message(chat_id, reply)
+        except Exception as e:
+            print("Bot error:", e)
+            time.sleep(5)
+
+if __name__ == "__main__":
+    threading.Thread(target=run_web, daemon=True).start()
+    run_bot()
