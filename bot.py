@@ -1,25 +1,34 @@
 import os
+import time
 import threading
+import requests
 from flask import Flask
+
+# التوكن - منجرب كل الأسماء مشان ما يوقف
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN") or os.getenv("TOKEN")
+GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+
+print("Token exists:", bool(TELEGRAM_TOKEN))
+print("Gemini exists:", bool(GEMINI_KEY))
+
 app = Flask(__name__)
+
 @app.route("/")
 def home():
     return "Bot is alive!"
-threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000))), daemon=True).start()
-import os
-import time
-import requests
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 def ask_gemini(text):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
     data = {"contents": [{"parts": [{"text": text}]}]}
-    r = requests.post(url, json=data, timeout=30)
     try:
+        r = requests.post(url, json=data, timeout=30)
         return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except:
+    except Exception as e:
+        print("Gemini error:", e)
         return "صار في مشكلة شوي، جرب مرة تانية."
 
 def send(chat_id, text):
@@ -40,21 +49,15 @@ def main():
                 chat_id = msg.get("chat", {}).get("id")
                 if text and chat_id:
                     print("User:", text)
-                    reply = ask_gemini(text)
-                    send(chat_id, reply)
+                    if text == "/start":
+                        send(chat_id, "هلا! أنا عدنان الذكي 🤖 اسألني أي شي")
+                    else:
+                        reply = ask_gemini(text)
+                        send(chat_id, reply)
         except Exception as e:
-            print(e)
+            print("Loop error:", e)
             time.sleep(2)
-from flask import Flask
-import threading
-import os
-app = Flask(__name__)
-@app.route("/")
-def home():
-    return "Bot is running!"
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     main()
