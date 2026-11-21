@@ -21,7 +21,7 @@ def run_web():
     app.run(host="0.0.0.0", port=port)
 
 def ask_gemini(text):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
     data = {"contents": [{"parts": [{"text": text}]}]}
     try:
         r = requests.post(url, json=data, timeout=30)
