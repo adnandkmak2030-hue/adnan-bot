@@ -1,18 +1,42 @@
 import os
-import telebot
+import time
+import requests
 
-TOKEN = os.environ.get("BOT_TOKEN", "حط_التوكن_هون")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 
-bot = telebot.TeleBot(TOKEN)
+def ask_gemini(text):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    data = {"contents": [{"parts": [{"text": text}]}]}
+    r = requests.post(url, json=data, timeout=30)
+    try:
+        return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    except:
+        return "صار في مشكلة شوي، جرب مرة تانية."
 
-@bot.message_handler(commands=['start'])
-def start_cmd(message):
-    bot.reply_to(message, "أهلا فيك! أنا بوتك العربي، شغال تمام ✅")
+def send(chat_id, text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    requests.post(url, json={"chat_id": chat_id, "text": text[:4000]})
 
-@bot.message_handler(func=lambda m: True)
-def echo(message):
-    if message.text:
-        bot.reply_to(message, "وصلتني رسالتك: " + message.text)
+def main():
+    offset = 0
+    print("Bot started...")
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates?timeout=30&offset={offset}"
+            res = requests.get(url, timeout=35).json()
+            for upd in res.get("result", []):
+                offset = upd["update_id"] + 1
+                msg = upd.get("message", {})
+                text = msg.get("text", "")
+                chat_id = msg.get("chat", {}).get("id")
+                if text and chat_id:
+                    print("User:", text)
+                    reply = ask_gemini(text)
+                    send(chat_id, reply)
+        except Exception as e:
+            print(e)
+            time.sleep(2)
 
-print("البوت شغال...")
-bot.infinity_polling()
+if __name__ == "__main__":
+    main()
